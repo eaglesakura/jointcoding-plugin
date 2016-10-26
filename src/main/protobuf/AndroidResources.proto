@@ -1,0 +1,33 @@
+option java_package = "com.eaglesakura.jc.parser.model";
+
+
+// R.javaの内容
+
+//
+message GeneratedValue {
+    // 名称
+    required string name = 1;
+    // 値
+    required string value = 2;
+}
+
+// R.javaに含まれるべき内容
+message R {
+    repeated GeneratedValue layouts = 1;
+
+    repeated GeneratedValue strings = 2;
+
+    repeated GeneratedValue dimens = 3;
+
+    repeated GeneratedValue integers = 4;
+
+    required GeneratedValue colors = 5;
+
+    required GeneratedValue anims = 6;
+
+    required GeneratedValue bools = 7;
+
+    required GeneratedValue raws = 8;
+
+    required GeneratedValue styles = 9;
+}

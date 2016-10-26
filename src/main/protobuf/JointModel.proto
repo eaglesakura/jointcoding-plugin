@@ -1,0 +1,118 @@
+option java_package = "com.eaglesakura.jc.parser.model";
+
+// クラス内、メソッドのフィールドを示す
+message Field {
+    // 型名
+    // java版の修飾子が必要
+    // 配列の場合は[]を付ける
+    required string fieldType = 1;
+
+    // フィールド名
+    required string fieldName = 2;
+
+    // フィールドの持つ属性情報
+    enum FieldAttribute {
+        // public static final属性が付いている
+        Constant = 0;
+
+        // static属性
+        Static = 1;
+
+        // JCFieldが付与されている
+        Export = 2;
+    }
+
+    // 属性情報
+    repeated FieldAttribute fieldAttributes = 4;
+
+    // 値
+    optional string value = 3;
+}
+
+// メソッドを示す
+message Method {
+    // 戻り値のjava型
+    // 配列の場合は次元数に応じた[を付ける
+    // 2次元配列の場合: [[lang.java.Object
+    required string resultType = 1;
+
+    // メソッド名
+    required string name = 2;
+
+    // 引数を示す
+    message Argment {
+        // 型名
+        // javaの完全修飾が使用される
+        // 配列の場合は次元数だけ[を付ける
+        required string argType = 10;
+
+        // 引数名
+        optional string argName = 11;
+    }
+
+    // 引数リスト
+    repeated Argment args = 3;
+
+    // メソッドの持つ属性情報
+    enum MethodAttribute {
+        // static属性
+        Static = 1;
+
+        // nativeメソッド
+        Native = 2;
+
+        // publicメソッド
+        Public = 3;
+
+        // JCMethodが定義されている
+        Export = 4;
+    }
+
+    // メソッドの持つ属性一覧
+    repeated MethodAttribute methodAttributes = 4;
+}
+
+
+// クラス型を示す
+// C++でClass/Interfaceとして出力される
+message Class {
+    // Javaでのpackage名
+    required string javaPackageName = 1;
+    // Javaでのclass名
+    required string javaClassName = 2;
+    // Javaでの基底クラスの完全修飾
+    required string superClassName = 3;
+    // 実装されているinterface一覧の完全修飾
+    repeated string interfaceClassNames = 4;
+
+    // 出力タイプを決定する
+    enum ClassType {
+        // classオブジェクトとして定義する
+        Class = 0;
+
+        // interface/protocolとして定義する
+        Interface = 1;
+
+        // 出力対象ではないが、属性として入れておく
+        NotExported = -1;
+    }
+
+    // クラスの種類
+    required ClassType type = 6;
+
+    // クラスが持つフィールド一覧
+    repeated Field fields = 7;
+
+    // クラスが持つメソッド一覧
+    repeated Method methods = 8;
+
+    // C++ Namespace
+    optional string cppNamespace = 101;
+}
+
+
+// 変換を行ったクラスを一元管理してファイル化出来るようにする
+message GeneratedClasses {
+    // 出力対象のクラス
+    repeated Class classes = 1;
+}

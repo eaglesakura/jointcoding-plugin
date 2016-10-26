@@ -1,0 +1,204 @@
+/**
+ * 0.2.x  : CircleCI移行
+ */
+def ARTIFACT_VERSION = "0.2"
+def ARTIFACT_NAME = file(".").absoluteFile.name
+def ARTIFACT_INSTALL_TARGET = getArtifactInstallTarget()
+apply plugin: 'groovy'
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
+// Local or maven
+if (!hasProperty("EGLIBRARY_COMPILE_LOCAL")) {
+    ext.EGLIBRARY_COMPILE_LOCAL = false
+}
+
+repositories {
+    maven { url "http://eaglesakura.github.io/maven/" }
+    mavenCentral()
+}
+
+configurations {
+    groovyDoc
+}
+
+dependencies {
+    // build groovy
+    compile gradleApi()
+    groovyDoc 'org.codehaus.groovy:groovy-groovydoc:2.3.3'
+    groovyDoc 'org.codehaus.groovy:groovy-ant:2.3.3'
+
+    if (EGLIBRARY_COMPILE_LOCAL) {
+        compile project(':eglibrary:simple-logger')
+        compile project(':eglibrary:simple-utils')
+        compile project(':eglibrary:gradle-plugin-utils')
+        compile project(':eglibrary:jointconnector-annotations')
+    } else {
+        compile 'com.eaglesakura:simple-logger:1.1.+'
+        compile 'com.eaglesakura:simple-utils:1.1.+'
+        compile 'com.eaglesakura:gradle-plugin-utils:1.0.+'
+        compile 'com.eaglesakura:jointconnector-annotations:0.2.+'
+    }
+
+    compile 'commons-codec:commons-codec:1.10'
+    // parser
+    compile 'com.google.protobuf:protobuf-java:2.5.+'
+    compile 'org.javassist:javassist:3.18.+'
+
+    // UnitTest
+    testCompile 'junit:junit:4.12'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs += ["src/main/gen/protobuf"];
+        }
+    }
+}
+
+apply plugin: 'maven'
+
+groovydoc {
+    groovyClasspath = configurations.groovyDoc
+}
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task groovydocJar(type: Jar, dependsOn: groovydoc) {
+    classifier = 'javadoc'
+    from "${buildDir}/docs/groovydoc"
+}
+
+artifacts {
+    archives sourcesJar
+    archives groovydocJar
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: uri(ARTIFACT_INSTALL_TARGET))
+            pom.version = ARTIFACT_VERSION + getArtifactVersionSuffix()
+            pom.groupId = "com.eaglesakura"
+            pom.artifactId = file(".").absoluteFile.name;
+        }
+    }
+}
+
+[uploadArchives.repositories.mavenDeployer]*.pom*.whenConfigured { pom ->
+    pom.project {
+        inceptionYear '2016'
+        packaging 'jar'
+        licenses {
+            license {
+                name 'NYSL'
+                url 'https://raw.githubusercontent.com/eaglesakura/eglibrary/master/LICENSE-NYSL-eng.txt'
+            }
+            license {
+                name 'MIT License'
+                url 'https://raw.githubusercontent.com/eaglesakura/eglibrary/master/LICENSE-MIT.txt'
+            }
+        }
+        dependencies {
+            dependency {
+                groupId 'com.eaglesakura'
+                artifactId = 'simple-logger'
+                version = dependenceisVersion("com.eaglesakura:simple-logger", "1.+")
+                scope = 'compile'
+            }
+
+            dependency {
+                groupId 'com.eaglesakura'
+                artifactId = 'simple-utils'
+                version = dependenceisVersion("com.eaglesakura:simple-utils", "1.+")
+                scope = 'compile'
+            }
+
+            dependency {
+                groupId 'com.eaglesakura'
+                artifactId = 'gradle-plugin-utils'
+                version = dependenceisVersion("com.eaglesakura:gradle-plugin-utils", "1.+")
+                scope = 'compile'
+            }
+
+            dependency {
+                groupId = 'commons-codec'
+                artifactId = 'commons-codec'
+                version = '1.10'
+                scope = 'compile'
+            }
+        }
+    }
+}
+
+task uploadGroovydoc << {
+    def src = file("build/docs/groovydoc/");
+    def dst = new File("${ARTIFACT_INSTALL_TARGET.absolutePath}/doc/${ARTIFACT_NAME}/");
+    dst.deleteDir();
+    dst.mkdirs();
+
+    ["/usr/bin/rsync", "-a", src.absolutePath, dst.absolutePath].execute().text;
+}
+
+/**
+ * 依存している固定ライブラリバージョンを取得する
+ */
+String dependenceisVersion(String libName, String defVersion) {
+    def lines = [];
+    def target = file("dependencies.txt");
+    if (!target.file) {
+        return defVersion;
+    }
+
+    target.text.eachLine {
+        if (!it.contains(libName) || it.contains("(")) {
+            return;
+        }
+
+        def tokens = it.split(" ");
+        if (tokens == null || tokens.length == 0) {
+            return;
+        }
+
+        lines += tokens[tokens.length - 1];
+    }
+    if (lines.empty) {
+        println("${libName} -> ${defVersion}")
+        return defVersion;
+    } else {
+        println("${libName} -> ${lines[0]}")
+        return lines[0];
+    }
+}
+
+/**
+ * バージョンを取得する
+ * CircleCIの場合、バージョン末尾にビルド番号を付与する
+ */
+def getArtifactVersionSuffix() {
+    if (System.env.CIRCLE_BUILD_NUM != null) {
+        // CircleCIのバージョンが指定されているので、そちらを利用する
+        return ".${System.env.CIRCLE_BUILD_NUM}"
+    } else {
+        return ".local"
+    }
+}
+
+/**
+ * Mavenの格納先を確定する
+ */
+def getArtifactInstallTarget() {
+    if (file("maven").directory) {
+        return file("maven");
+    } else if (System.env.CIRCLE_ARTIFACTS != null) {
+        return file(System.env.CIRCLE_ARTIFACTS);
+    } else if (System.env.MAVEN_LOCAL_REPO != null) {
+        return file(System.env.MAVEN_LOCAL_REPO);
+    } else {
+        return file("ci-release");
+    }
+}
